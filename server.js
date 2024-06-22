@@ -1,86 +1,93 @@
 const express = require('express');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const path = require('path');
 
 const app = express();
-const dbPath = path.resolve(__dirname, './data/music.db');
-const db = new sqlite3.Database(dbPath);
+const dbConfig = {
+  user: process.env.PGUSER,
+  host: process.env.PGHOST,
+  database: process.env.PGDATABASE,
+  password: process.env.PGPASSWORD,
+  port: process.env.PGPORT
+};
 
+const pool = new Pool(dbConfig);
 
 app.use(cors({
-	origin: '*',
-	methods: ['GET', 'POST', 'PUT', 'DELETE'],
-	allowedHeaders: ['Content-Type']
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type']
 }));
 
 app.use(express.json());
 
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 app.get('/', (req, res) => {
-	res.send('Welcome to the Music Player API');
+  res.send('Welcome to the Music Player API');
 });
 
-app.get('/artists', (req, res) => {
-	db.all('SELECT * FROM artists', [], (err, rows) => {
-		if (err) {
-			res.status(500).json({ error: err.message });
-			return;
-		}
-		res.json({ artists: rows });
-	});
+app.get('/test-db', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    res.json({ currentTime: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/albums', (req, res) => {
-	db.all(
-		`SELECT albums.*, artists.name as artist_name
-		FROM albums
-		JOIN artists ON albums.artist_id = artists.id`,
-		[],
-		(err, rows) => {
-			if (err) {
-				res.status(500).json({ error: err.message });
-				return;
-			}
-			res.json({ albums: rows });
-		}
-	);
+app.get('/artists', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM artists');
+    res.json({ artists: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/songs', (req, res) => {
-	db.all(
-		`SELECT songs.*, albums.title as album_title
-		FROM songs
-		JOIN albums ON songs.album_id = albums.id`,
-		[],
-		(err, rows) => {
-			if (err) {
-				res.status(500).json({ error: err.message });
-				return;
-			}
-			res.json({ songs: rows });
-		}
-	);
+app.get('/albums', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT albums.*, artists.name as artist_name
+      FROM albums
+      JOIN artists ON albums.artist_id = artists.id
+    `);
+    res.json({ albums: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/random-songs', (req, res) => {
-	db.all(
-		`SELECT songs.id, songs.title AS songTitle, artists.name AS artistName, albums.title AS albumTitle, songs.file_path AS filePath 
-		FROM songs 
-		JOIN albums ON songs.album_id = albums.id 
-		JOIN artists ON albums.artist_id = artists.id 
-		ORDER BY RANDOM() LIMIT 6`,
-		[],
-		(err, rows) => {
-			if (err) {
-				res.status(500).json({ error: err.message });
-				return;
-			}
-			res.json({ songs: rows });
-		}
-	);
+app.get('/songs', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT songs.*, albums.title as album_title
+      FROM songs
+      JOIN albums ON songs.album_id = albums.id
+    `);
+    res.json({ songs: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/random-songs', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT songs.id, songs.title AS songTitle, artists.name AS artistName, albums.title AS albumTitle, songs.file_path AS filePath 
+      FROM songs 
+      JOIN albums ON songs.album_id = albums.id 
+      JOIN artists ON albums.artist_id = artists.id 
+      ORDER BY RANDOM() LIMIT 6
+    `);
+    res.json({ songs: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-	console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
