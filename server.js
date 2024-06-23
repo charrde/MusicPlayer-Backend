@@ -32,13 +32,14 @@ const s3 = new AWS.S3({
 	region: s3Region
 });
 
-const allowedOrigins = ['https://patrickskinner-musicplayer.netlify.app/'];
+const allowedOrigins = ['https://patrickskinner-musicplayer.netlify.app'];
 
 app.use(cors({
 	origin: function (origin, callback) {
 		if (!origin || allowedOrigins.indexOf(origin) !== -1) {
 			callback(null, true);
-		} else {
+		} 
+		else {
 			callback(new Error('Not allowed by CORS'));
 		}
 	},
@@ -69,7 +70,8 @@ app.post('/register', async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *', [username, hashedPassword]);
 		res.status(201).json({ user: result.rows[0] });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -85,7 +87,8 @@ app.post('/login', async (req, res) => {
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
 		res.json({ token });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -94,7 +97,8 @@ app.get('/artists', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM artists');
 		res.json({ artists: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -104,7 +108,8 @@ app.post('/artists', requireAuth, async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO artists (name) VALUES ($1) RETURNING *', [name]);
 		res.status(201).json({ artist: result.rows[0] });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -114,7 +119,8 @@ app.get('/albums/:artist_id', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM albums WHERE artist_id = $1', [artist_id]);
 		res.json({ albums: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -127,7 +133,8 @@ app.post('/albums', requireAuth, async (req, res) => {
 			[title, artist_id, release_year, genres]
 		);
 		res.status(201).json({ album: result.rows[0] });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -152,7 +159,8 @@ app.get('/songs', async (req, res) => {
 				artists ON songs.artist_id = artists.id
 		`);
 		res.json({ songs: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -178,7 +186,8 @@ app.get('/random-songs', async (req, res) => {
 			ORDER BY RANDOM() LIMIT 6
 		`);
 		res.json({ songs: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -204,7 +213,8 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 		);
 
 		res.status(201).json({ message: 'Song added successfully!', song: result.rows[0] });
-	} catch (err) {
+	} 
+	catch (err) {
 		console.error('Error adding song:', err);
 		res.status(500).json({ error: err.message, stack: err.stack });
 	}
@@ -226,7 +236,8 @@ app.get('/presigned-url/:key', async (req, res) => {
 	try {
 		const url = s3.getSignedUrl('getObject', params);
 		res.json({ url });
-	} catch (err) {
+	} 
+	catch (err) {
 		console.error('Error generating pre-signed URL:', err);
 		res.status(500).json({ error: err.message });
 	}
