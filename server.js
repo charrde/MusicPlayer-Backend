@@ -105,7 +105,7 @@ app.get('/albums/:artist_id', requireAuth, async (req, res) => {
 		const result = await pool.query('SELECT * FROM albums WHERE artist_id = $1', [artist_id]);
 		res.json({ albums: result.rows });
 	} catch (err) {
-		res.status{500}.json({ error: err.message });
+		res.status(500).json({ error: err.message });
 	}
 });
 
