@@ -183,7 +183,8 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 		Bucket: s3BucketName,
 		Key: `${Date.now()}_${file.originalname}`,
 		Body: file.buffer,
-		ContentType: file.mimetype
+		ContentType: file.mimetype,
+		ACL: 'public-read'
 	};
 
 	try {
