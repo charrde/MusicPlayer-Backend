@@ -183,12 +183,12 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 		Bucket: s3BucketName,
 		Key: `${Date.now()}_${file.originalname}`,
 		Body: file.buffer,
-		ContentType: file.mimetype,
+		ContentType: file.mimetype
 	};
 
 	try {
 		const uploadResult = await s3.upload(uploadParams).promise();
-		const file_path = uploadResult.Location; 
+		const file_path = uploadResult.Location; // URL of the uploaded file
 
 		const result = await pool.query(
 			`INSERT INTO songs (title, album_id, artist_id, file_path, rating) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -204,11 +204,15 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 
 app.get('/presigned-url/:key', async (req, res) => {
 	const key = req.params.key;
+	const clientIp = req.ip;
 
 	const params = {
 		Bucket: s3BucketName,
 		Key: key,
-		Expires: 60 // URL valid for 60 seconds
+		Expires: 300, 
+		Conditions: [
+			{ 'IpAddress': clientIp }
+		]
 	};
 
 	try {
