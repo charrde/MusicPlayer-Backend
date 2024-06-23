@@ -2,11 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const path = require('path');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { expressjwt: expressJwt } = require('express-jwt');
+const AWS = require('aws-sdk');
 
 const app = express();
 const dbConfig = {
@@ -21,11 +21,16 @@ const pool = new Pool(dbConfig);
 
 const jwtSecret = process.env.JWT_SECRET;
 const preSharedSecret = process.env.PRE_SHARED_SECRET;
+const s3BucketName = process.env.S3_BUCKET_NAME;
+const s3Region = process.env.S3_REGION;
+const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID;
+const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
 
-if (!jwtSecret) {
-	console.error('JWT_SECRET environment variable is not set');
-	process.exit(1);
-}
+const s3 = new AWS.S3({
+	accessKeyId: s3AccessKeyId,
+	secretAccessKey: s3SecretAccessKey,
+	region: s3Region
+});
 
 app.use(cors({
 	origin: '*',
@@ -35,19 +40,9 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname)));
-
-const storage = multer.diskStorage({
-	destination: (req, file, cb) => {
-		cb(null, path.join(__dirname, 'data/audio'));
-	},
-	filename: (req, file, cb) => {
-		cb(null, Date.now() + path.extname(file.originalname));
-	},
-});
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Middleware to protect routes
 const requireAuth = expressJwt({ secret: jwtSecret, algorithms: ['HS256'] });
 
 app.get('/', (req, res) => {
@@ -58,7 +53,6 @@ app.get('/', (req, res) => {
 app.post('/register', async (req, res) => {
 	const { username, password, secret } = req.body;
 
-	// Check secret
 	if (secret !== preSharedSecret) {
 		return res.status(403).json({ error: 'Forbidden' });
 	}
@@ -67,8 +61,7 @@ app.post('/register', async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *', [username, hashedPassword]);
 		res.status(201).json({ user: result.rows[0] });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -84,8 +77,7 @@ app.post('/login', async (req, res) => {
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
 		res.json({ token });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -94,8 +86,7 @@ app.get('/artists', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM artists');
 		res.json({ artists: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -105,8 +96,7 @@ app.post('/artists', requireAuth, async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO artists (name) VALUES ($1) RETURNING *', [name]);
 		res.status(201).json({ artist: result.rows[0] });
-	}
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -116,8 +106,7 @@ app.get('/albums/:artist_id', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM albums WHERE artist_id = $1', [artist_id]);
 		res.json({ albums: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -130,8 +119,7 @@ app.post('/albums', requireAuth, async (req, res) => {
 			[title, artist_id, release_year, genres]
 		);
 		res.status(201).json({ album: result.rows[0] });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -156,8 +144,7 @@ app.get('/songs', async (req, res) => {
 				artists ON songs.artist_id = artists.id
 		`);
 		res.json({ songs: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -183,26 +170,33 @@ app.get('/random-songs', async (req, res) => {
 			ORDER BY RANDOM() LIMIT 6
 		`);
 		res.json({ songs: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
 
 app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => {
 	const { title, album_id, artist_id, rating } = req.body;
-	const file_path = `/data/audio/${req.file.filename}`;
+	const file = req.file;
+
+	const uploadParams = {
+		Bucket: s3BucketName,
+		Key: `${Date.now()}_${file.originalname}`,
+		Body: file.buffer,
+		ContentType: file.mimetype
+	};
 
 	try {
-		console.log('Adding song with details:', { title, album_id, artist_id, rating, file_path });
+		const uploadResult = await s3.upload(uploadParams).promise();
+		const file_path = uploadResult.Location;
+
 		const result = await pool.query(
 			`INSERT INTO songs (title, album_id, artist_id, file_path, rating) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
 			[title, album_id, artist_id, file_path, rating]
 		);
-		console.log('Song added successfully:', result.rows[0]);
+
 		res.status(201).json({ message: 'Song added successfully!', song: result.rows[0] });
-	} 
-	catch (err) {
+	} catch (err) {
 		console.error('Error adding song:', err);
 		res.status(500).json({ error: err.message, stack: err.stack });
 	}
