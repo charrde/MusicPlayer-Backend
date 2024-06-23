@@ -67,7 +67,8 @@ app.post('/register', async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *', [username, hashedPassword]);
 		res.status(201).json({ user: result.rows[0] });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -83,7 +84,8 @@ app.post('/login', async (req, res) => {
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
 		res.json({ token });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -92,7 +94,8 @@ app.get('/artists', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM artists');
 		res.json({ artists: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -102,7 +105,8 @@ app.post('/artists', requireAuth, async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO artists (name) VALUES ($1) RETURNING *', [name]);
 		res.status(201).json({ artist: result.rows[0] });
-	} catch (err) {
+	}
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -112,7 +116,8 @@ app.get('/albums/:artist_id', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM albums WHERE artist_id = $1', [artist_id]);
 		res.json({ albums: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -125,7 +130,8 @@ app.post('/albums', requireAuth, async (req, res) => {
 			[title, artist_id, release_year, genres]
 		);
 		res.status(201).json({ album: result.rows[0] });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -150,7 +156,8 @@ app.get('/songs', async (req, res) => {
 				artists ON songs.artist_id = artists.id
 		`);
 		res.json({ songs: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -176,7 +183,8 @@ app.get('/random-songs', async (req, res) => {
 			ORDER BY RANDOM() LIMIT 6
 		`);
 		res.json({ songs: result.rows });
-	} catch (err) {
+	} 
+	catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -186,14 +194,17 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 	const file_path = `/data/audio/${req.file.filename}`;
 
 	try {
-		await pool.query(
-			`INSERT INTO songs (title, album_id, artist_id, file_path, rating) VALUES ($1, $2, $3, $4, $5)`,
+		console.log('Adding song with details:', { title, album_id, artist_id, rating, file_path });
+		const result = await pool.query(
+			`INSERT INTO songs (title, album_id, artist_id, file_path, rating) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
 			[title, album_id, artist_id, file_path, rating]
 		);
-		res.status(201).json({ message: 'Song added successfully!' });
-	} catch (err) {
+		console.log('Song added successfully:', result.rows[0]);
+		res.status(201).json({ message: 'Song added successfully!', song: result.rows[0] });
+	} 
+	catch (err) {
 		console.error('Error adding song:', err);
-		res.status(500).json({ error: err.message });
+		res.status(500).json({ error: err.message, stack: err.stack });
 	}
 });
 
