@@ -192,6 +192,22 @@ app.get('/random-songs', async (req, res) => {
 	}
 });
 
+app.post('/update-song-file/:id', [requireAuth, upload.single('file')], async (req, res) => {
+	const songId = req.params.id;
+	const file_path = `/data/audio/${req.file.filename}`;
+
+	try {
+		await pool.query(
+			`UPDATE songs SET file_path = $1 WHERE id = $2`,
+			[file_path, songId]
+		);
+		res.status(200).json({ message: 'Song file updated successfully!' });
+	} 
+	catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
 app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => {
 	const { title, album_id, artist_id, rating } = req.body;
 	const file = req.file;
