@@ -253,6 +253,8 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 app.get('/presigned-url/:key', async (req, res) => {
 	const key = req.params.key;
 
+	console.log('Generating pre-signed URL for key:', key);
+
 	const params = {
 		Bucket: s3BucketName,
 		Key: key,
@@ -268,6 +270,7 @@ app.get('/presigned-url/:key', async (req, res) => {
 		res.status(500).json({ error: err.message });
 	}
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
