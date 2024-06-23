@@ -194,16 +194,30 @@ app.get('/random-songs', async (req, res) => {
 
 app.post('/update-song-file/:id', [requireAuth, upload.single('file')], async (req, res) => {
 	const songId = req.params.id;
-	const file_path = `/data/audio/${req.file.filename}`;
+	const file = req.file;
+
+	if (!file) {
+		return res.status(400).json({ error: 'No file uploaded' });
+	}
+
+	const uploadParams = {
+		Bucket: s3BucketName,
+		Key: `${Date.now()}_${file.originalname}`,
+		Body: file.buffer,
+		ContentType: file.mimetype
+	};
 
 	try {
+		const uploadResult = await s3.upload(uploadParams).promise();
+		const file_path = uploadResult.Location;
+
 		await pool.query(
 			`UPDATE songs SET file_path = $1 WHERE id = $2`,
 			[file_path, songId]
 		);
-		res.status(200).json({ message: 'Song file updated successfully!' });
-	} 
-	catch (err) {
+		res.status(200).json({ message: 'Song file updated successfully!', file_path });
+	} catch (err) {
+		console.error('Error updating song file:', err);
 		res.status(500).json({ error: err.message });
 	}
 });
