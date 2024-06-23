@@ -53,10 +53,21 @@ app.get('/albums', async (req, res) => {
 app.get('/songs', async (req, res) => {
 	try {
 		const result = await pool.query(`
-			SELECT songs.*, albums.title as album_title, artists.name as artist_name
-			FROM songs
-			LEFT JOIN albums ON songs.album_id = albums.id
-			JOIN artists ON songs.artist_id = artists.id
+			SELECT
+				songs.id AS song_id,
+				songs.title AS song_title,
+				COALESCE(songs.album_id, 0) AS album_id,
+				COALESCE(albums.title, 'Single') AS album_title,
+				songs.artist_id,
+				artists.name AS artist_name,
+				songs.file_path AS file_path,
+				songs.rating
+			FROM
+				songs
+			LEFT JOIN
+				albums ON songs.album_id = albums.id
+			JOIN
+				artists ON songs.artist_id = artists.id
 		`);
 		res.json({ songs: result.rows });
 	} catch (err) {
@@ -64,13 +75,26 @@ app.get('/songs', async (req, res) => {
 	}
 });
 
+
+
 app.get('/random-songs', async (req, res) => {
 	try {
 		const result = await pool.query(`
-			SELECT songs.id, songs.title AS songTitle, artists.name AS artistName, albums.title AS albumTitle, songs.file_path AS filePath, songs.rating 
-			FROM songs 
-			LEFT JOIN albums ON songs.album_id = albums.id 
-			JOIN artists ON songs.artist_id = artists.id 
+			SELECT
+				songs.id AS song_id,
+				songs.title AS song_title,
+				COALESCE(songs.album_id, 0) AS album_id,
+				COALESCE(albums.title, 'Single') AS album_title,
+				songs.artist_id,
+				artists.name AS artist_name,
+				songs.file_path AS file_path,
+				songs.rating
+			FROM
+				songs
+			LEFT JOIN
+				albums ON songs.album_id = albums.id
+			JOIN
+				artists ON songs.artist_id = artists.id
 			ORDER BY RANDOM() LIMIT 6
 		`);
 		res.json({ songs: result.rows });
@@ -78,6 +102,8 @@ app.get('/random-songs', async (req, res) => {
 		res.status(500).json({ error: err.message });
 	}
 });
+
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
