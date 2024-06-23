@@ -252,15 +252,11 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 
 app.get('/presigned-url/:key', async (req, res) => {
 	const key = req.params.key;
-	const clientIp = req.ip;
 
 	const params = {
 		Bucket: s3BucketName,
 		Key: key,
-		Expires: 300, 
-		Conditions: [
-			{ 'IpAddress': clientIp }
-		]
+		Expires: 300
 	};
 
 	try {
