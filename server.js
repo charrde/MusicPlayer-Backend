@@ -23,6 +23,7 @@ app.use(cors({
 
 app.use(express.json());
 
+// Configure Multer for file uploads
 const storage = multer.diskStorage({
 	destination: (req, file, cb) => {
 		cb(null, path.join(__dirname, '../data/audio'));
@@ -34,11 +35,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 app.get('/', (req, res) => {
-	res.sendFile(path.join(__dirname, '../index.html'));
-});
-
-app.get('/add-song', (req, res) => {
-	res.sendFile(path.join(__dirname, '../add-song.html'));
+	res.send('Welcome to the Shmoovin Music Player API');
 });
 
 app.get('/artists', async (req, res) => {
@@ -67,6 +64,16 @@ app.get('/albums', async (req, res) => {
 			FROM albums
 			JOIN artists ON albums.artist_id = artists.id
 		`);
+		res.json({ albums: result.rows });
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
+app.get('/albums/:artist_id', async (req, res) => {
+	const artist_id = req.params.artist_id;
+	try {
+		const result = await pool.query('SELECT * FROM albums WHERE artist_id = $1', [artist_id]);
 		res.json({ albums: result.rows });
 	} catch (err) {
 		res.status(500).json({ error: err.message });
