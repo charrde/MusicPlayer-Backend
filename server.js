@@ -32,8 +32,16 @@ const s3 = new AWS.S3({
 	region: s3Region
 });
 
+const allowedOrigins = ['https://patrickskinner-musicplayer.netlify.app/'];
+
 app.use(cors({
-	origin: '*',
+	origin: function (origin, callback) {
+		if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+			callback(null, true);
+		} else {
+			callback(new Error('Not allowed by CORS'));
+		}
+	},
 	methods: ['GET', 'POST', 'PUT', 'DELETE'],
 	allowedHeaders: ['Content-Type', 'Authorization']
 }));
