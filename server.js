@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const path = require('path');
+const multer = require('multer');
 
 const app = express();
 const dbConfig = {
@@ -22,10 +23,23 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use('/public', express.static(path.join(__dirname, 'public')));
+// Configure Multer for file uploads
+const storage = multer.diskStorage({
+	destination: (req, file, cb) => {
+		cb(null, path.join(__dirname, '../data/audio'));
+	},
+	filename: (req, file, cb) => {
+		cb(null, Date.now() + path.extname(file.originalname));
+	},
+});
+const upload = multer({ storage });
 
 app.get('/', (req, res) => {
-	res.send('Welcome to the Shmoovin Music Player API');
+	res.sendFile(path.join(__dirname, '../index.html'));
+});
+
+app.get('/add-song', (req, res) => {
+	res.sendFile(path.join(__dirname, '../add-song.html'));
 });
 
 app.get('/artists', async (req, res) => {
@@ -75,8 +89,6 @@ app.get('/songs', async (req, res) => {
 	}
 });
 
-
-
 app.get('/random-songs', async (req, res) => {
 	try {
 		const result = await pool.query(`
@@ -103,7 +115,20 @@ app.get('/random-songs', async (req, res) => {
 	}
 });
 
+app.post('/add-song', upload.single('file'), async (req, res) => {
+	const { title, album_id, artist_id, rating } = req.body;
+	const file_path = `/data/audio/${req.file.filename}`;
 
+	try {
+		await pool.query(
+			`INSERT INTO songs (title, album_id, artist_id, file_path, rating) VALUES ($1, $2, $3, $4, $5)`,
+			[title, album_id, artist_id, file_path, rating]
+		);
+		res.status(201).json({ message: 'Song added successfully!' });
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
