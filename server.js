@@ -58,7 +58,7 @@ app.get('/', (req, res) => {
 app.post('/register', async (req, res) => {
 	const { username, password, secret } = req.body;
 
-	// Check the provided secret
+	// Check secret
 	if (secret !== preSharedSecret) {
 		return res.status(403).json({ error: 'Forbidden' });
 	}
@@ -192,6 +192,7 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 		);
 		res.status(201).json({ message: 'Song added successfully!' });
 	} catch (err) {
+		console.error('Error adding song:', err);
 		res.status(500).json({ error: err.message });
 	}
 });
