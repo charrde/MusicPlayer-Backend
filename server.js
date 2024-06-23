@@ -184,12 +184,11 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 		Key: `${Date.now()}_${file.originalname}`,
 		Body: file.buffer,
 		ContentType: file.mimetype,
-		ACL: 'public-read'
 	};
 
 	try {
 		const uploadResult = await s3.upload(uploadParams).promise();
-		const file_path = uploadResult.Location;
+		const file_path = uploadResult.Location; 
 
 		const result = await pool.query(
 			`INSERT INTO songs (title, album_id, artist_id, file_path, rating) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -200,6 +199,24 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 	} catch (err) {
 		console.error('Error adding song:', err);
 		res.status(500).json({ error: err.message, stack: err.stack });
+	}
+});
+
+app.get('/presigned-url/:key', async (req, res) => {
+	const key = req.params.key;
+
+	const params = {
+		Bucket: s3BucketName,
+		Key: key,
+		Expires: 60 // URL valid for 60 seconds
+	};
+
+	try {
+		const url = s3.getSignedUrl('getObject', params);
+		res.json({ url });
+	} catch (err) {
+		console.error('Error generating pre-signed URL:', err);
+		res.status(500).json({ error: err.message });
 	}
 });
 
