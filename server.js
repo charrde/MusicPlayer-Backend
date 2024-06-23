@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
@@ -21,6 +22,11 @@ const pool = new Pool(dbConfig);
 const jwtSecret = process.env.JWT_SECRET;
 const preSharedSecret = process.env.PRE_SHARED_SECRET;
 
+if (!jwtSecret) {
+	console.error('JWT_SECRET environment variable is not set');
+	process.exit(1);
+}
+
 app.use(cors({
 	origin: '*',
 	methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -29,9 +35,11 @@ app.use(cors({
 
 app.use(express.json());
 
+app.use(express.static(path.join(__dirname)));
+
 const storage = multer.diskStorage({
 	destination: (req, file, cb) => {
-		cb(null, path.join(__dirname, '../data/audio'));
+		cb(null, path.join(__dirname, 'data/audio'));
 	},
 	filename: (req, file, cb) => {
 		cb(null, Date.now() + path.extname(file.originalname));
@@ -80,7 +88,7 @@ app.post('/login', async (req, res) => {
 	}
 });
 
-app.get('/artists', requireAuth, async (req, res) => {
+app.get('/artists', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM artists');
 		res.json({ artists: result.rows });
@@ -99,7 +107,7 @@ app.post('/artists', requireAuth, async (req, res) => {
 	}
 });
 
-app.get('/albums/:artist_id', requireAuth, async (req, res) => {
+app.get('/albums/:artist_id', async (req, res) => {
 	const artist_id = req.params.artist_id;
 	try {
 		const result = await pool.query('SELECT * FROM albums WHERE artist_id = $1', [artist_id]);
@@ -122,7 +130,7 @@ app.post('/albums', requireAuth, async (req, res) => {
 	}
 });
 
-app.get('/songs', requireAuth, async (req, res) => {
+app.get('/songs', async (req, res) => {
 	try {
 		const result = await pool.query(`
 			SELECT
