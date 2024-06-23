@@ -23,7 +23,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Configure Multer for file uploads
 const storage = multer.diskStorage({
 	destination: (req, file, cb) => {
 		cb(null, path.join(__dirname, '../data/audio'));
@@ -51,6 +50,16 @@ app.get('/artists', async (req, res) => {
 	}
 });
 
+app.post('/artists', async (req, res) => {
+	const { name } = req.body;
+	try {
+		const result = await pool.query('INSERT INTO artists (name) VALUES ($1) RETURNING *', [name]);
+		res.status(201).json({ artist: result.rows[0] });
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
 app.get('/albums', async (req, res) => {
 	try {
 		const result = await pool.query(`
@@ -59,6 +68,19 @@ app.get('/albums', async (req, res) => {
 			JOIN artists ON albums.artist_id = artists.id
 		`);
 		res.json({ albums: result.rows });
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
+app.post('/albums', async (req, res) => {
+	const { title, artist_id, release_year, genres } = req.body;
+	try {
+		const result = await pool.query(
+			'INSERT INTO albums (title, artist_id, release_year, genres) VALUES ($1, $2, $3, $4) RETURNING *',
+			[title, artist_id, release_year, genres]
+		);
+		res.status(201).json({ album: result.rows[0] });
 	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
