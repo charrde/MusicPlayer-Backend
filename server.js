@@ -240,7 +240,7 @@ app.get('/presigned-url/:key', async (req, res) => {
 	const blobClient = containerClient.getBlobClient(key);
 
 	try {
-		const expiresOn = new Date(new Date().valueOf() + 300 * 1000); // 5 minutes
+		const expiresOn = new Date(new Date().valueOf() + 360 * 1000); // 6 minutes
 
 		const sasToken = generateBlobSASQueryParameters(
 			{
