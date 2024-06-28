@@ -6,7 +6,8 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { expressjwt: expressJwt } = require('express-jwt');
-const AWS = require('aws-sdk');
+const { BlobServiceClient, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const dbConfig = {
@@ -21,16 +22,11 @@ const pool = new Pool(dbConfig);
 
 const jwtSecret = process.env.JWT_SECRET;
 const preSharedSecret = process.env.PRE_SHARED_SECRET;
-const s3BucketName = process.env.S3_BUCKET_NAME;
-const s3Region = process.env.S3_REGION;
-const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID;
-const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+const azureConnectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+const azureContainerName = process.env.AZURE_CONTAINER_NAME;
 
-const s3 = new AWS.S3({
-	accessKeyId: s3AccessKeyId,
-	secretAccessKey: s3SecretAccessKey,
-	region: s3Region
-});
+const blobServiceClient = BlobServiceClient.fromConnectionString(azureConnectionString);
+const containerClient = blobServiceClient.getContainerClient(azureContainerName);
 
 const allowedOrigins = ['https://patrickskinner-musicplayer.netlify.app'];
 
@@ -38,8 +34,7 @@ app.use(cors({
 	origin: function (origin, callback) {
 		if (!origin || allowedOrigins.indexOf(origin) !== -1) {
 			callback(null, true);
-		} 
-		else {
+		} else {
 			callback(new Error('Not allowed by CORS'));
 		}
 	},
@@ -70,8 +65,7 @@ app.post('/register', async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *', [username, hashedPassword]);
 		res.status(201).json({ user: result.rows[0] });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -87,8 +81,7 @@ app.post('/login', async (req, res) => {
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
 		res.json({ token });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -97,8 +90,7 @@ app.get('/artists', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM artists');
 		res.json({ artists: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -108,8 +100,7 @@ app.post('/artists', requireAuth, async (req, res) => {
 	try {
 		const result = await pool.query('INSERT INTO artists (name) VALUES ($1) RETURNING *', [name]);
 		res.status(201).json({ artist: result.rows[0] });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -119,8 +110,7 @@ app.get('/albums/:artist_id', async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM albums WHERE artist_id = $1', [artist_id]);
 		res.json({ albums: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -133,8 +123,7 @@ app.post('/albums', requireAuth, async (req, res) => {
 			[title, artist_id, release_year, genres]
 		);
 		res.status(201).json({ album: result.rows[0] });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -159,8 +148,7 @@ app.get('/songs', async (req, res) => {
 				artists ON songs.artist_id = artists.id
 		`);
 		res.json({ songs: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -186,8 +174,7 @@ app.get('/random-songs', async (req, res) => {
 			ORDER BY RANDOM() LIMIT 6
 		`);
 		res.json({ songs: result.rows });
-	} 
-	catch (err) {
+	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -200,16 +187,14 @@ app.post('/update-song-file/:id', [requireAuth, upload.single('file')], async (r
 		return res.status(400).json({ error: 'No file uploaded' });
 	}
 
-	const uploadParams = {
-		Bucket: s3BucketName,
-		Key: `${Date.now()}_${file.originalname}`,
-		Body: file.buffer,
-		ContentType: file.mimetype
-	};
+	const blobName = `${uuidv4()}_${file.originalname}`;
+	const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
 	try {
-		const uploadResult = await s3.upload(uploadParams).promise();
-		const file_path = uploadResult.Location;
+		await blockBlobClient.upload(file.buffer, file.buffer.length, {
+			blobHTTPHeaders: { blobContentType: file.mimetype }
+		});
+		const file_path = blockBlobClient.url;
 
 		await pool.query(
 			`UPDATE songs SET file_path = $1 WHERE id = $2`,
@@ -226,16 +211,14 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 	const { title, album_id, artist_id, rating } = req.body;
 	const file = req.file;
 
-	const uploadParams = {
-		Bucket: s3BucketName,
-		Key: `${Date.now()}_${file.originalname}`,
-		Body: file.buffer,
-		ContentType: file.mimetype
-	};
+	const blobName = `${uuidv4()}_${file.originalname}`;
+	const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
 	try {
-		const uploadResult = await s3.upload(uploadParams).promise();
-		const file_path = uploadResult.Location; // URL of the uploaded file
+		await blockBlobClient.upload(file.buffer, file.buffer.length, {
+			blobHTTPHeaders: { blobContentType: file.mimetype }
+		});
+		const file_path = blockBlobClient.url;
 
 		const result = await pool.query(
 			`INSERT INTO songs (title, album_id, artist_id, file_path, rating) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -243,8 +226,7 @@ app.post('/add-song', [requireAuth, upload.single('file')], async (req, res) => 
 		);
 
 		res.status(201).json({ message: 'Song added successfully!', song: result.rows[0] });
-	} 
-	catch (err) {
+	} catch (err) {
 		console.error('Error adding song:', err);
 		res.status(500).json({ error: err.message, stack: err.stack });
 	}
@@ -255,17 +237,25 @@ app.get('/presigned-url/:key', async (req, res) => {
 
 	console.log('Generating pre-signed URL for key:', key);
 
-	const params = {
-		Bucket: s3BucketName,
-		Key: key,
-		Expires: 300
-	};
+	const blobClient = containerClient.getBlobClient(key);
 
 	try {
-		const url = s3.getSignedUrl('getObject', params);
-		res.json({ url });
-	} 
-	catch (err) {
+		const expiresOn = new Date(new Date().valueOf() + 300 * 1000); // 5 minutes
+
+		const sasToken = generateBlobSASQueryParameters(
+			{
+				containerName: azureContainerName,
+				blobName: key,
+				permissions: BlobSASPermissions.parse('r'),
+				expiresOn
+			},
+			blobServiceClient.credential
+		).toString();
+
+		const sasUrl = `${blobClient.url}?${sasToken}`;
+
+		res.json({ url: sasUrl });
+	} catch (err) {
 		console.error('Error generating pre-signed URL:', err);
 		res.status(500).json({ error: err.message });
 	}
