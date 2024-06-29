@@ -75,11 +75,9 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
 	const { username, password } = req.body;
 	try {
-		console.log('Login attempt for user:', username);
 		const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
 		const user = result.rows[0];
 		if (!user || !(await bcrypt.compare(password, user.password))) {
-			console.log('Invalid credentials for user:', username);
 			return res.status(401).json({ error: 'Invalid credentials' });
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
@@ -87,7 +85,7 @@ app.post('/login', async (req, res) => {
 		res.cookie('token', token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
-			sameSite: 'Strict',
+			sameSite: 'None', //bad
 			maxAge: 3600000
 		});
 
@@ -95,7 +93,6 @@ app.post('/login', async (req, res) => {
 		res.setHeader('Set-Cookie', res.getHeader('Set-Cookie'));
 		res.json({ message: 'Login successful' });
 	} catch (err) {
-		console.error('Error during login for user:', username, err.message);
 		res.status(500).json({ error: err.message });
 	}
 });
