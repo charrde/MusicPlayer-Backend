@@ -39,7 +39,8 @@ app.use(cors({
 		}
 	},
 	methods: ['GET', 'POST', 'PUT', 'DELETE'],
-	allowedHeaders: ['Content-Type', 'Authorization']
+	allowedHeaders: ['Content-Type', 'Authorization'],
+	credentials: true
 }));
 
 app.use(express.json());
@@ -99,6 +100,7 @@ app.get('/artists', async (req, res) => {
 		const result = await pool.query('SELECT * FROM artists');
 		res.json({ artists: result.rows });
 	} catch (err) {
+		console.error('Error during login for user:', username, err.message);
 		res.status(500).json({ error: err.message });
 	}
 });
