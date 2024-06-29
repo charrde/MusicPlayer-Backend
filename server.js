@@ -80,7 +80,15 @@ app.post('/login', async (req, res) => {
 			return res.status(401).json({ error: 'Invalid credentials' });
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
-		res.json({ token });
+
+		res.cookie('token', token, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'Strict',
+			maxAge: 3600000
+		});
+
+		res.json({ message: 'Login successful' });
 	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
