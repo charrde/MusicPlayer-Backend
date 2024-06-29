@@ -66,17 +66,22 @@ app.get('/', (req, res) => {
 });
 
 app.get('/auth-check', (req, res) => {
-	const token = req.cookies.token;
-	if (!token) {
-		return res.status(401).json({ authenticated: false });
-	}
-
-	jwt.verify(token, jwtSecret, (err, decoded) => {
-		if (err) {
+	try {
+		const token = req.cookies.token;
+		if (!token) {
 			return res.status(401).json({ authenticated: false });
 		}
-		res.json({ authenticated: true });
-	});
+
+		jwt.verify(token, jwtSecret, (err, decoded) => {
+			if (err) {
+				return res.status(401).json({ authenticated: false });
+			}
+			res.json({ authenticated: true });
+		});
+	} catch (error) {
+		console.error('Error during auth check:', error.message);
+		res.status(500).json({ error: error.message });
+	}
 });
 
 // Register new users
