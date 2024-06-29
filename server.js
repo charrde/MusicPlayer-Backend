@@ -43,6 +43,13 @@ app.use(cors({
 	credentials: true
 }));
 
+app.options('*', cors({
+	origin: allowedOrigins,
+	methods: ['GET', 'POST', 'PUT', 'DELETE'],
+	allowedHeaders: ['Content-Type', 'Authorization'],
+	credentials: true
+}));
+
 app.use(express.json());
 
 const storage = multer.memoryStorage();
@@ -75,23 +82,32 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
 	const { username, password } = req.body;
 	try {
+		console.log('Login attempt for user:', username);
+		const start = Date.now();
 		const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+		console.log(`Database query time: ${Date.now() - start}ms`);
 		const user = result.rows[0];
 		if (!user || !(await bcrypt.compare(password, user.password))) {
+			console.log('Invalid credentials for user:', username);
 			return res.status(401).json({ error: 'Invalid credentials' });
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
 
 		res.cookie('token', token, {
 			httpOnly: true,
-			secure: true,
-			sameSite: 'None', //bad
-			maxAge: 3600000
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'None',
+			maxAge: 3600000 // 1 hour in milliseconds
 		});
+
+		console.log('Login successful for user:', username);
+		res.json({ message: 'Login successful' });
 	} catch (err) {
+		console.error('Error during login for user:', username, err.message);
 		res.status(500).json({ error: err.message });
 	}
 });
+
 
 
 app.get('/artists', async (req, res) => {
