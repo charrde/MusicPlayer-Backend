@@ -8,8 +8,11 @@ const jwt = require('jsonwebtoken');
 const { expressjwt: expressJwt } = require('express-jwt');
 const { BlobServiceClient, generateBlobSASQueryParameters, BlobSASPermissions } = require('@azure/storage-blob');
 const { v4: uuidv4 } = require('uuid');
+const cookieParser = require('cookie-parser');
 
 const app = express();
+app.use(cookieParser());
+
 const dbConfig = {
 	user: process.env.PGUSER,
 	host: process.env.PGHOST,
