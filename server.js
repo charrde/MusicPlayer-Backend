@@ -55,10 +55,28 @@ app.use(express.json());
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-const requireAuth = expressJwt({ secret: jwtSecret, algorithms: ['HS256'] });
+const requireAuth = expressJwt({
+	secret: jwtSecret,
+	algorithms: ['HS256'],
+	getToken: (req) => req.cookies.token
+});
 
 app.get('/', (req, res) => {
 	res.send('Welcome to the Shmoovin Music Player API');
+});
+
+app.get('/auth-check', (req, res) => {
+	const token = req.cookies.token;
+	if (!token) {
+		return res.status(401).json({ authenticated: false });
+	}
+
+	jwt.verify(token, jwtSecret, (err, decoded) => {
+		if (err) {
+			return res.status(401).json({ authenticated: false });
+		}
+		res.json({ authenticated: true });
+	});
 });
 
 // Register new users
@@ -82,30 +100,22 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
 	const { username, password } = req.body;
 	try {
-		console.log('Login attempt for user:', username);
 		const start = Date.now();
 		const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-		console.log(`Database query time: ${Date.now() - start}ms`);
 		const user = result.rows[0];
 		if (!user || !(await bcrypt.compare(password, user.password))) {
-			console.log('Invalid credentials for user:', username);
 			return res.status(401).json({ error: 'Invalid credentials' });
 		}
 		const token = jwt.sign({ id: user.id, username: user.username }, jwtSecret, { expiresIn: '1h' });
 
 		res.cookie('token', token, {
 			httpOnly: true,
-			secure: true,
+			secure: process.env.NODE_ENV !== 'development',
 			sameSite: 'None',
 			maxAge: 3600000,
-			domain: 'patrickskinner-musicplayer.netlify.app',
-			path: '/'
 		});
-
-		console.log('Login successful for user:', username);
 		res.json({ message: 'Login successful' });
 	} catch (err) {
-		console.error('Error during login for user:', username, err.message);
 		res.status(500).json({ error: err.message });
 	}
 });
