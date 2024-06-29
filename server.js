@@ -84,14 +84,10 @@ app.post('/login', async (req, res) => {
 
 		res.cookie('token', token, {
 			httpOnly: true,
-			secure: process.env.NODE_ENV === 'production',
+			secure: true,
 			sameSite: 'None', //bad
 			maxAge: 3600000
 		});
-
-		console.log('Login successful for user:', username);
-		res.setHeader('Set-Cookie', res.getHeader('Set-Cookie'));
-		res.json({ message: 'Login successful' });
 	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
