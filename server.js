@@ -31,7 +31,7 @@ const azureContainerName = process.env.AZURE_CONTAINER_NAME;
 const blobServiceClient = BlobServiceClient.fromConnectionString(azureConnectionString);
 const containerClient = blobServiceClient.getContainerClient(azureContainerName);
 
-const allowedOrigins = ['https://patrickskinner-musicplayer.netlify.app'];
+const allowedOrigins = process.env.ALLOWED_ORIGIN;
 
 app.use(cors({
 	origin: function (origin, callback) {
